@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Cronograma de moviles y motorizados</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Public+Sans:wght@400;500;600&display=swap" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main>
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:12px;">
+      <div>
+        <h1>Cronograma de moviles y motorizados</h1>
+        <p class="note" id="st">Modo local: los datos se guardan en este navegador.</p>
+      </div>
+      <!-- PESTAÑAS PRINCIPALES -->
+      <div class="view-tabs" role="tablist">
+        <button class="view-tab active" id="btnTabCrono" type="button" role="tab" aria-selected="true">1. Cronograma y Visitas</button>
+        <button class="view-tab" id="btnTabPax" type="button" role="tab" aria-selected="false">2. Asistencia de Personal</button>
+        <button class="view-tab" id="btnTabVeh" type="button" role="tab" aria-selected="false">3. Inoperatividad de Camionetas</button>
+        <button class="view-tab" id="btnTabStats" type="button" role="tab" aria-selected="false">4. Estadísticas y Horas Extras (Colombia)</button>
+        <button class="view-tab" id="btnTabTicket" type="button" role="tab" aria-selected="false">5. Plantilla Ticket y Paradas de Reloj</button>
+      </div>
+    </div>
+
+    <div class="bar">
+      <div class="mes">
+        <button id="pv" aria-label="Mes anterior">&lsaquo;</button>
+        <span id="ml"></span>
+        <button id="nx" aria-label="Mes siguiente">&rsaquo;</button>
+      </div>
+      <button class="btn pri" id="add">+ Actividad</button>
+      <button class="btn" id="addMv">+ Movil / moto</button>
+      <button class="btn" id="btnOpenVehModal">+ Operatividad movil</button>
+      <button class="btn" id="imp">Importar Excel</button>
+      <input type="file" id="fi" accept=".xlsx,.xls,.csv" hidden />
+      <button class="btn" id="exp">Exportar Excel</button>
+      <button class="btn" id="btnSyncGh" title="Cargar datos almacenados en el repositorio de GitHub">Cargar de GitHub</button>
+      <button class="btn" id="btnExportJson" title="Descargar respaldo JSON de la base de datos">Respaldar JSON</button>
+      <button class="btn" id="btnImportJson" title="Restaurar base de datos desde archivo JSON">Restaurar JSON</button>
+      <input type="file" id="fiJson" accept=".json" hidden />
+      <button class="btn" id="ex">Cargar ejemplo</button>
+      <button class="btn" id="clr">Vaciar mes</button>
+      <input id="q" type="search" placeholder="Buscar actividad…" aria-label="Buscar" />
+      <select id="fe" aria-label="Filtrar por estado">
+        <option value="">Todos los estados</option>
+        <option value="p">Pendiente</option>
+        <option value="c">En curso</option>
+        <option value="h">Hecha</option>
+        <option value="b">Bloqueada</option>
+      </select>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- PESTAÑA 1: CRONOGRAMA DE ACTIVIDADES Y AGENDA DIARIA                -->
+    <!-- =================================================================== -->
+    <section id="tabCronograma">
+      <div class="kp" id="kp"></div>
+      <div class="leg" id="lg"></div>
+
+      <div class="dh" style="margin-top:34px">
+        <button class="btn" id="dp" aria-label="Día anterior">&lsaquo;</button>
+        <h2 id="dl"></h2>
+        <button class="btn" id="dn" aria-label="Día siguiente">&rsaquo;</button>
+        <button class="btn" id="hoy">Hoy</button>
+        <div class="ring" id="rg"><span></span></div>
+      </div>
+      <div class="ag" id="ag"></div>
+
+      <h2>Cronograma del mes</h2>
+      <p class="note" style="margin:-6px 0 12px">
+        Clic en una celda para crear o editar; clic en un día para ver su agenda y control de personal. Contorno: pendiente · mitad: en curso · lleno: hecha · rayado: bloqueada.
+      </p>
+      <div class="gw" id="gw"></div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- PESTAÑA 2: ESTADÍSTICA Y GRÁFICA DE ASISTENCIA DE PERSONAL          -->
+    <!-- =================================================================== -->
+    <section id="tabPersonal" class="hidden">
+      <!-- KPIs de Asistencia -->
+      <div class="kp" id="paxKpis"></div>
+
+      <!-- Selector de Fecha para Inspección Diaria de Personal -->
+      <div class="dh" style="margin-top:28px">
+        <button class="btn" id="pxDp" type="button" aria-label="Día anterior">&lsaquo;</button>
+        <h2 id="pxDl"></h2>
+        <button class="btn" id="pxDn" type="button" aria-label="Día siguiente">&rsaquo;</button>
+        <button class="btn" id="pxHoy" type="button">Hoy</button>
+        <div class="ring" id="pxRing" title="Porcentaje de asistencia del día"><span>100%</span></div>
+      </div>
+
+      <!-- Gráficas de Asistencia: Por Movil (Día) y Evolución Mensual (Días 1-30) -->
+      <div class="st-grid">
+        <div class="st-card">
+          <h3>Gráfica de asistencia por movil y motorizado (Personas presentes vs. requeridas)</h3>
+          <p class="note" style="margin-top:2px; margin-bottom:10px">
+            Cada bloque verde representa 1 persona presente en la movil; el bloque rojo rayado indica ausencia o novedad. Usa &minus; / + para ajustar.
+          </p>
+          <div id="paxUnitChart"></div>
+        </div>
+
+        <div class="st-card">
+          <h3>Tendencia diaria de asistencia en el mes</h3>
+          <p class="note" style="margin-top:2px; margin-bottom:6px">
+            Total de personas activas por día sobre el total requerido de la flota. Haz clic en una barra para ver ese día.
+          </p>
+          <div class="day-bars" id="paxMonthBars"></div>
+          <div id="paxNoveltySummary" style="margin-top:14px"></div>
+        </div>
+      </div>
+
+      <!-- Tabla Estadística Mensual por Unidad -->
+      <h2>Estadística mensual de asistencia por movil</h2>
+      <div class="st-card" style="padding:0; overflow:auto">
+        <table class="st-tbl" id="paxSummaryTable"></table>
+      </div>
+
+      <!-- Matriz Diaria de Personal del Mes (Personas en cada movil día por día) -->
+      <h2>Matriz diaria de personal en el mes (Cantidad de personas por movil)</h2>
+      <p class="note" style="margin:-6px 0 12px">
+        Muestra la cantidad de personas presentes cada día en cada movil (verde: dotación completa · rojo: dotación incompleta). Haz clic en cualquier celda para editar la asistencia o registrar novedades.
+      </p>
+      <div class="gw" id="paxGridWrap"></div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- PESTAÑA 3: INOPERATIVIDAD DE CAMIONETAS Y DISPONIBILIDAD DE FLOTA    -->
+    <!-- =================================================================== -->
+    <section id="tabVehiculos" class="hidden">
+      <!-- KPIs de Operatividad de Flota -->
+      <div class="kp" id="vehKpis"></div>
+
+      <!-- Selector de Fecha para Inspección Diaria de Vehículos -->
+      <div class="dh" style="margin-top:28px">
+        <button class="btn" id="vehDp" type="button" aria-label="Día anterior">&lsaquo;</button>
+        <h2 id="vehDl"></h2>
+        <button class="btn" id="vehDn" type="button" aria-label="Día siguiente">&rsaquo;</button>
+        <button class="btn" id="vehHoy" type="button">Hoy</button>
+        <div class="ring" id="vehRing" title="Disponibilidad operativa de la flota hoy"><span>100%</span></div>
+      </div>
+
+      <!-- Panel de Estado Operativo de cada Unidad en el Día -->
+      <div class="st-grid">
+        <div class="st-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+            <div>
+              <h3 style="margin:0">Estado operativo de camionetas y motos en el día</h3>
+              <p class="note" style="margin-top:2px; margin-bottom:0">
+                Verifica unidades en servicio vs paradas (taller, varadas, sin cuadrilla, restricción o descanso).
+              </p>
+            </div>
+            <button class="btn" id="btnQuickRegVeh" type="button" style="font-size:12px; padding:6px 10px">+ Registrar novedad</button>
+          </div>
+          <div id="vehDayList"></div>
+        </div>
+
+        <div class="st-card">
+          <h3>Días trabajados vs. días paradas en el mes</h3>
+          <p class="note" style="margin-top:2px; margin-bottom:12px">
+            Comparativa mensual de días en que las camionetas y motos estuvieron operativas vs fuera de servicio.
+          </p>
+          <div id="vehMonthBars"></div>
+          <div id="vehDowntimeCauses" style="margin-top:14px"></div>
+        </div>
+      </div>
+
+      <!-- Tabla Estadística de Inoperatividad Mensual por Movil -->
+      <h2>Días que las camionetas dejan de trabajar (Resumen mensual)</h2>
+      <div class="st-card" style="padding:0; overflow:auto">
+        <table class="st-tbl" id="vehSummaryTable"></table>
+      </div>
+
+      <!-- Matriz Diaria de Operatividad en el Mes -->
+      <h2>Matriz diaria de operatividad vehicular en el mes</h2>
+      <p class="note" style="margin:-6px 0 12px">
+        Verde: Operativa en servicio · Naranja: Taller/Mantenimiento · Rojo: Varada · Púrpura: Sin cuadrilla · Gris: Descanso. Clic en cualquier celda para cambiar estado.
+      </p>
+      <div class="gw" id="vehGridWrap"></div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- PESTAÑA 4: ESTADÍSTICAS OPERATIVAS & HORAS EXTRAS (COLOMBIA CST)    -->
+    <!-- =================================================================== -->
+    <section id="tabEstadisticas" class="hidden">
+      <!-- KPIs Estadísticos Clave del Mes -->
+      <div class="stat-hero-grid" id="statsHeroGrid"></div>
+
+      <!-- BLOQUE A: TIEMPOS POR ACTIVIDADES -->
+      <h2>A. Tiempos por actividades (Horas totales y promedio de duración)</h2>
+      <div class="st-grid">
+        <div class="st-card">
+          <h3>Horas acumuladas por tipo de actividad técnica</h3>
+          <p class="note" style="margin-top:2px; margin-bottom:10px">
+            Distribución del tiempo total invertido en Preventivos, Correctivos, Empalmes, Mediciones, Enrutamientos, Auditorías y Depuraciones.
+          </p>
+          <div id="statsTimeBars" class="stat-bars-wrap"></div>
+        </div>
+
+        <div class="st-card">
+          <h3>Métricas de duración y franjas horarias</h3>
+          <p class="note" style="margin-top:2px; margin-bottom:12px">
+            Duración promedio por visita y concentración de horas en franjas AM, PM o Día Completo.
+          </p>
+          <div id="statsDurationCards"></div>
+        </div>
+      </div>
+
+      <!-- BLOQUE B: CONTROL DE HORAS EXTRAS Y JORNADA LABORAL (COLOMBIA) -->
+      <h2>B. Control de horas extras y jornadas laborales (Normativa CST / Ley 2101)</h2>
+      <p class="note" style="margin:-6px 0 12px">
+        Regulación laboral en Colombia: Jornada ordinaria diaria de 8h (42h semanales Ley 2101). Horas Extras Diurnas (HED 06:00–21:00, recargo +25%) y Horas Extras Nocturnas (HEN 21:00–06:00, recargo +75%). Límite legal CST Art. 22 Ley 50/1990: Máximo 2 horas extras diarias y 12 horas extras semanales por trabajador.
+      </p>
+      <div class="st-card" style="padding:0; overflow:auto">
+        <table class="st-tbl" id="statsOvertimeTable"></table>
+      </div>
+
+      <!-- BLOQUE C: CANTIDAD DE VISITAS POR MOVILES -->
+      <h2>C. Cantidad de visitas realizadas por moviles y motorizados</h2>
+      <div class="st-card" style="padding:0; overflow:auto">
+        <table class="st-tbl" id="statsVisitsTable"></table>
+      </div>
+
+      <!-- BLOQUE D: ESTADOS DE LAS ACTIVIDADES -->
+      <h2>D. Estados de las actividades y efectividad operativa</h2>
+      <div class="st-grid">
+        <div class="st-card">
+          <h3>Distribución general de estados en el mes</h3>
+          <p class="note" style="margin-top:2px; margin-bottom:10px">
+            Porcentaje y volumen de actividades Hechas (cumplidas), En curso, Pendientes y Bloqueadas.
+          </p>
+          <div id="statsStatusChart"></div>
+        </div>
+
+        <div class="st-card">
+          <h3>Visitas bloqueadas o con alertas activas</h3>
+          <p class="note" style="margin-top:2px; margin-bottom:10px">
+            Detección de actividades detenidas por permisos, accesos, materiales o contingencias operativas.
+          </p>
+          <div id="statsBlockedList"></div>
+        </div>
+      </div>
+
+      <!-- AUDITOR OPERATIVO Y ALERTAS LABORALES -->
+      <h3 style="margin-top:28px">Auditor de Cumplimiento Operativo y Laboral (CST Colombia)</h3>
+      <p class="note" style="margin:2px 0 10px">
+        Evaluador automático de la planificación: detecta exceso de horas extras legales (>2h/día o >12h/semana), moviles varadas con visitas asignadas o cuadrillas incompletas en visitas prioritarias.
+      </p>
+      <div class="audit-grid" id="auditAlerts"></div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- PESTAÑA 5: PLANTILLA DE TICKET, WHATSAPP Y PARADAS DE RELOJ          -->
+    <!-- =================================================================== -->
+    <section id="tabTicket" class="hidden">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+        <div>
+          <h2>5. Gestión de Fallas, Plantilla WhatsApp y Paradas de Reloj</h2>
+          <p class="note" style="margin:2px 0 0">
+            Control técnico de fallas críticas de fibra óptica, cálculo de tiempos brutos vs. netos con paradas de reloj (tiempos muertos) y generación instantánea de plantilla para WhatsApp.
+          </p>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn pri" id="btnCopyWaTemplate" type="button">📋 Copiar plantilla WhatsApp</button>
+          <button class="btn" id="btnResetTicketData" type="button">↺ Restablecer ticket demo</button>
+        </div>
+      </div>
+
+      <!-- Resumen KPIs del Ticket -->
+      <div class="stat-hero-grid" id="ticketKpiGrid">
+        <div class="stat-hero-card">
+          <span>Tiempo Bruto Falla</span>
+          <b id="tkKpiBruto">17h 50m</b>
+          <small>Desde inicio de falla a fin</small>
+        </div>
+        <div class="stat-hero-card">
+          <span>Paradas de Reloj (Tiempos Muertos)</span>
+          <b id="tkKpiParadas" style="color:#f28c28">1h 45m</b>
+          <small id="tkKpiCantParadas">1 parada registrada</small>
+        </div>
+        <div class="stat-hero-card">
+          <span>Tiempo Neto de Atención</span>
+          <b id="tkKpiNeto" style="color:#2fa84f">16h 05m</b>
+          <small>Descontando paradas de reloj</small>
+        </div>
+        <div class="stat-hero-card">
+          <span>SLA Contractual (Límite 5h)</span>
+          <b id="tkKpiSla" style="color:#d23b3b">Excede SLA (+11h 05m)</b>
+          <small id="tkKpiSlaSub">Meta contractual: máx 5 horas</small>
+        </div>
+        <div class="stat-hero-card">
+          <span>Potencia Óptica Rx</span>
+          <b id="tkKpiRx" style="color:#d23b3b">-40.0 dBm</b>
+          <small>Alarma Low (Corte de Fibra)</small>
+        </div>
+      </div>
+
+      <div class="st-grid" style="margin-top:16px;">
+        <!-- Columna Izquierda: Formulario de Datos de la Falla y Tiempos -->
+        <div class="st-card">
+          <h3>1. Datos de la Falla e Información Técnica</h3>
+          
+          <div class="r2" style="margin-top:12px;">
+            <div>
+              <label for="tkNum">No. Ticket (CRM)</label>
+              <input type="text" id="tkNum" value="TIK-20322201-G8N8" />
+            </div>
+            <div>
+              <label for="tkUfinet">ID Cliente Ufinet</label>
+              <input type="text" id="tkUfinet" value="COCOUNE10092132C" />
+            </div>
+          </div>
+
+          <div class="r2">
+            <div>
+              <label for="tkClient">Cliente / Operador</label>
+              <input type="text" id="tkClient" value="UNE EPM TELECOMUNICACIONES S.A. (Millicom)" />
+            </div>
+            <div>
+              <label for="tkFinalClient">Cliente Final</label>
+              <input type="text" id="tkFinalClient" value="JERONIMO MARTINS" />
+            </div>
+          </div>
+
+          <div class="r2">
+            <div>
+              <label for="tkContact">Contacto en Sitio</label>
+              <input type="text" id="tkContact" value="Daniel Camilo Bernal" />
+            </div>
+            <div>
+              <label for="tkPhone">Teléfono de Contacto</label>
+              <input type="text" id="tkPhone" value="3243387504" />
+            </div>
+          </div>
+
+          <div class="r2">
+            <div>
+              <label for="tkAddress">Dirección del Evento</label>
+              <input type="text" id="tkAddress" value="Barranquilla - Calle 87 # 42B1-48 Nogales" />
+            </div>
+            <div>
+              <label for="tkCoords">Coordenadas GPS</label>
+              <input type="text" id="tkCoords" value="5.9270266,-75.6713538" />
+            </div>
+          </div>
+
+          <div class="r2">
+            <div>
+              <label for="tkNode">Nombre de Nodo</label>
+              <input type="text" id="tkNode" value="ANC - Anconsur" />
+            </div>
+            <div>
+              <label for="tkEquipment">Equipo de Acceso</label>
+              <input type="text" id="tkEquipment" value="COANAMAGTDSCPITRC01 (10.247.194.127)" />
+            </div>
+          </div>
+
+          <div class="r2">
+            <div>
+              <label for="tkPort">Puerto / Interfaz</label>
+              <input type="text" id="tkPort" value="nni2 (1000BASE-X Down - Vlans 1153, 1154)" />
+            </div>
+            <div>
+              <label for="tkPotenciaRx">Potencia Óptica Rx</label>
+              <input type="text" id="tkPotenciaRx" value="-40.0 dBm (low-alarm)" />
+            </div>
+          </div>
+
+          <div class="r2">
+            <div>
+              <label for="tkType">Tipo de Falla</label>
+              <select id="tkType">
+                <option value="Corte Fibra">Corte Fibra Óptica</option>
+                <option value="Atenuación Óptica">Atenuación Óptica Severa</option>
+                <option value="Falla Equipo">Falla de Transceptor / SFP</option>
+                <option value="Corte de Energía">Corte de Energía en Nodo</option>
+              </select>
+            </div>
+            <div>
+              <label for="tkUnitAssigned">Cuadrilla / Movil asignada</label>
+              <select id="tkUnitAssigned"></select>
+            </div>
+          </div>
+
+          <h3 style="margin-top:20px;">2. Tiempos de Atención de la Falla</h3>
+          <div class="r2" style="margin-top:10px;">
+            <div>
+              <label for="tkStartFalla">Hora de inicio de la falla</label>
+              <input type="datetime-local" id="tkStartFalla" value="2026-11-01T00:40" />
+            </div>
+            <div>
+              <label for="tkStartSitio">Hora de llegada a sitio / inicio cuadrilla</label>
+              <input type="datetime-local" id="tkStartSitio" value="2026-11-01T08:00" />
+            </div>
+          </div>
+          <div class="r2">
+            <div>
+              <label for="tkEndFalla">Hora final / restablecimiento</label>
+              <input type="datetime-local" id="tkEndFalla" value="2026-11-01T18:30" />
+            </div>
+            <div>
+              <label>Tiempo neto de atención (SLA)</label>
+              <div id="tkNetoBadge" style="padding:8px 10px; background:var(--bg); border:1px solid var(--ln); border-radius:8px; font-weight:700; color:#2fa84f">16h 05m</div>
+            </div>
+          </div>
+          <label for="tkDiagnostic">Diagnóstico técnico preliminar / OTDR</label>
+          <textarea id="tkDiagnostic" rows="2">Rx=-40.0 dBm (low-alarm). Corte total fibra en enlace NNI2 hacia COANAMAIFXSCPHYM01. Cuadrilla en verificación de ruta.</textarea>
+        </div>
+
+        <!-- Columna Derecha: Paradas de Reloj (Tiempos Muertos) y Vista Previa WhatsApp -->
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <!-- Paradas de Reloj -->
+          <div class="st-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div>
+                <h3 style="margin:0;">3. Paradas de Reloj (Tiempos Muertos)</h3>
+                <p class="note" style="margin:2px 0 0;">Descuentan tiempo que no es responsabilidad de O&M (espera de accesos, lluvia, cliente).</p>
+              </div>
+              <button class="btn pri" id="btnAddClockStop" type="button" style="font-size:12px; padding:6px 10px;">+ Agregar parada</button>
+            </div>
+
+            <!-- Lista de paradas de reloj registradas -->
+            <div id="clockStopList" style="display:flex; flex-direction:column; gap:8px; max-height:220px; overflow-y:auto; margin-bottom:12px;"></div>
+
+            <!-- Formulario para nueva parada de reloj -->
+            <div id="clockStopForm" style="background:var(--bg); padding:12px; border-radius:10px; border:1px solid var(--ln);">
+              <h4 style="margin:0 0 8px; font-size:13px;">Registrar nueva parada de reloj</h4>
+              <div class="r2">
+                <div>
+                  <label for="csStart">Inicio parada</label>
+                  <input type="datetime-local" id="csStart" value="2026-11-01T10:15" />
+                </div>
+                <div>
+                  <label for="csEnd">Fin parada</label>
+                  <input type="datetime-local" id="csEnd" value="2026-11-01T12:00" />
+                </div>
+              </div>
+              <div class="r2">
+                <div>
+                  <label for="csReason">Motivo de la parada</label>
+                  <select id="csReason">
+                    <option value="Permiso / Acceso a predio">Permiso / Espera de acceso a predio</option>
+                    <option value="Lluvia / Tormenta eléctrica">Clima adverso / Lluvia / Tormenta eléctrica</option>
+                    <option value="Trámite con cliente final">Trámite / Autorización con cliente final</option>
+                    <option value="Cierre de vía / Tránsito">Cierre de vía / Bloqueo vial</option>
+                    <option value="Sin fluido eléctrico comercial">Falta de energía comercial en nodo</option>
+                    <option value="Otro motivo">Otro motivo justificado</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="csDetail">Detalle / Justificación</label>
+                  <input type="text" id="csDetail" placeholder="Ej.: Vigilancia no autoriza ingreso hasta las 12:00" />
+                </div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; flex-wrap:wrap; gap:8px;">
+                <small class="note" style="color:#8ba2c4;">⏱️ Límite contractual de atención: <b>5 horas</b> (los tiempos muertos justificados se descuentan).</small>
+                <button class="btn pri" id="btnSaveClockStop" type="button" style="font-size:12px; padding:6px 12px;">Guardar parada</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Area de Texto y Plantilla WhatsApp -->
+          <div class="st-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+              <h3 style="margin:0;">4. Plantilla de Mensaje WhatsApp (Pegar / Copiar / Editar)</h3>
+              <div style="display:flex; gap:6px;">
+                <button class="btn" id="btnCopyWaTemplate2" type="button" style="font-size:12px; padding:6px 10px;" title="Copiar al portapapeles">📋 Copiar</button>
+                <button class="btn" id="btnPasteWaTemplate" type="button" style="font-size:12px; padding:6px 10px;" title="Pegar texto externo">📥 Pegar</button>
+                <button class="btn" id="btnRegenWaTemplate" type="button" style="font-size:12px; padding:6px 10px;" title="Regenerar con datos actuales del ticket">🔄 Regenerar</button>
+              </div>
+            </div>
+            <textarea id="waTemplateTextarea" rows="13" placeholder="Aquí se generará automáticamente el mensaje de WhatsApp. También puedes pegar o editar texto directamente..."></textarea>
+            <small class="note" style="display:block; margin-top:6px; color:#8ba2c4;">
+              💡 <b>Área interactiva:</b> Puedes editar el mensaje directamente antes de enviarlo por WhatsApp, pegar un reporte externo recibido para revisarlo o presionar <b>"Regenerar"</b> para reconstruirlo desde las casillas y paradas de reloj.
+            </small>
+            <pre id="waTemplatePreview" style="display:none;"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODAL 1: CREAR / EDITAR ACTIVIDAD -->
+    <dialog id="dg">
+      <h3 id="dt">Nueva actividad</h3>
+
+      <div class="r2">
+        <div>
+          <label for="fmv">Recurso operativo (Movil o moto)</label>
+          <select id="fmv"></select>
+        </div>
+        <div>
+          <label for="fk">Tipo de actividad</label>
+          <select id="fk"></select>
+        </div>
+      </div>
+
+      <div class="r2">
+        <div>
+          <label for="ff">Fecha de ejecución</label>
+          <input type="date" id="ff" />
+        </div>
+        <div>
+          <label for="fu">Repetir hasta (opcional)</label>
+          <input type="date" id="fu" />
+        </div>
+      </div>
+
+      <div class="r2">
+        <div>
+          <label for="fStart">Hora de inicio</label>
+          <input type="time" id="fStart" value="08:00" />
+        </div>
+        <div>
+          <label for="fEnd">Hora de finalización</label>
+          <input type="time" id="fEnd" value="12:00" />
+        </div>
+      </div>
+
+      <div class="r2">
+        <div>
+          <label>Duración calculada</label>
+          <div id="fDurBadge" style="padding:8px 10px; background:var(--bg); border:1px solid var(--ln); border-radius:8px; font-weight:700; color:var(--acc)">4.0 horas</div>
+        </div>
+        <div>
+          <label>Jornada laboral (Normativa CST)</label>
+          <div id="fLaborBadge" style="padding:8px 10px; background:var(--bg); border:1px solid var(--ln); border-radius:8px; font-size:13px">4.0h Ordinarias · 0h Extra</div>
+        </div>
+      </div>
+
+      <div class="r2">
+        <div>
+          <label for="fs">Franja</label>
+          <select id="fs">
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+            <option value="DIA">Día completo</option>
+          </select>
+        </div>
+        <div>
+          <label for="fe2">Estado</label>
+          <select id="fe2">
+            <option value="p">Pendiente</option>
+            <option value="c">En curso</option>
+            <option value="h">Hecha</option>
+            <option value="b">Bloqueada</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="ft">Descripción de la actividad</label>
+      <input id="ft" placeholder="Ej.: Preventivo tramo Medellín–Bello" />
+
+      <div class="r2">
+        <div>
+          <label for="fLoc">Municipio / zona</label>
+          <input id="fLoc" placeholder="Ej. Tarazá, Apartadó, Medellín..." />
+        </div>
+        <div>
+          <label for="fNode">Nodo / tramo / dirección</label>
+          <input id="fNode" placeholder="Identificador del nodo o tramo" />
+        </div>
+      </div>
+
+      <div class="r2">
+        <div>
+          <label for="fTik">Ticket / TIK / OT</label>
+          <input id="fTik" placeholder="Ej. TIK-XXXXXXXX" />
+        </div>
+        <div>
+          <label for="fPrio">Prioridad</label>
+          <select id="fPrio">
+            <option value="Normal">Normal</option>
+            <option value="Alta">Alta</option>
+            <option value="Crítica">Crítica</option>
+            <option value="Baja">Baja</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="fLead">Responsable / líder</label>
+      <input id="fLead" placeholder="Nombre del responsable" />
+
+      <label for="fNotes">Observaciones</label>
+      <textarea id="fNotes" rows="2" placeholder="Materiales, riesgos, acceso, avances, restricciones..."></textarea>
+
+      <div class="bar" style="justify-content:flex-end">
+        <button class="btn" id="dd" type="button" style="margin-right:auto">Eliminar</button>
+        <button class="btn" id="dc" type="button">Cancelar</button>
+        <button class="btn pri" id="ds" type="button">Guardar</button>
+      </div>
+    </dialog>
+
+    <!-- MODAL 2: ADICIONAR Y GESTIONAR MOVILES Y MOTOS -->
+    <dialog id="dgMv">
+      <h3>Moviles y motorizados</h3>
+      <p class="note" style="margin-top:4px">Agrega nuevas camionetas (moviles) o motos y su dotación de personal requerida.</p>
+
+      <div class="r2">
+        <div>
+          <label for="mvName">Nombre de la movil o moto</label>
+          <input id="mvName" placeholder="Ej.: Movil O&M Medellín 4 / Moto O&M 3" />
+        </div>
+        <div>
+          <label for="mvType">Tipo de unidad</label>
+          <select id="mvType">
+            <option value="Camioneta">Movil (Camioneta)</option>
+            <option value="Moto">Motorizado (Moto)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="r2">
+        <div>
+          <label for="mvZone">Municipio / zona base</label>
+          <input id="mvZone" placeholder="Ej.: Medellín, Tarazá, Apartadó…" />
+        </div>
+        <div>
+          <label for="mvPax">Personal requerido (personas)</label>
+          <input type="number" id="mvPax" min="1" max="10" value="3" />
+        </div>
+      </div>
+
+      <div class="bar" style="justify-content:flex-end; margin-top:12px">
+        <button class="btn pri" id="mvSave" type="button">+ Adicionar unidad</button>
+      </div>
+
+      <label style="margin-top:18px">Unidades activas en el cronograma (<span id="mvCount">7</span>)</label>
+      <div id="mvList" class="mv-list"></div>
+
+      <div class="bar" style="justify-content:flex-end; margin-top:16px">
+        <button class="btn" id="mvClose" type="button">Cerrar</button>
+      </div>
+    </dialog>
+
+    <!-- MODAL 3: CONTROL DIARIO DE PERSONAL POR MOVIL / MOTO -->
+    <dialog id="dgPax">
+      <h3 id="pxTitle">Control diario de personal</h3>
+      <p class="note" id="pxSub" style="margin-top:4px"></p>
+
+      <div class="r2">
+        <div>
+          <label for="pxDate">Fecha</label>
+          <input type="date" id="pxDate" />
+        </div>
+        <div>
+          <label for="pxUntil">Repetir hasta (opcional)</label>
+          <input type="date" id="pxUntil" />
+        </div>
+      </div>
+
+      <div class="r2">
+        <div>
+          <label for="pxCount">Personal disponible / presente hoy</label>
+          <input type="number" id="pxCount" min="0" max="10" value="3" />
+        </div>
+        <div>
+          <label for="pxStatus">Estado / Novedad de dotación</label>
+          <select id="pxStatus">
+            <option value="Completa">Dotación completa</option>
+            <option value="Incapacidad">Incapacidad médica</option>
+            <option value="Permiso">Permiso / calamidad</option>
+            <option value="Vacaciones">Vacaciones</option>
+            <option value="Capacitación">En capacitación</option>
+            <option value="Apoyo">Apoyo a otra movil</option>
+            <option value="Vacante">Vacante / sin cubrir</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="pxNames">Integrantes de la cuadrilla hoy</label>
+      <input id="pxNames" placeholder="Ej.: Juan Pérez (Líder), Carlos Ruiz, Andrés Gómez..." />
+
+      <label for="pxNote">Observaciones de personal</label>
+      <textarea id="pxNote" rows="2" placeholder="Detalle de ausencias, reemplazos o novedades del día..."></textarea>
+
+      <div class="bar" style="justify-content:flex-end; margin-top:16px">
+        <button class="btn" id="pxCancel" type="button">Cancelar</button>
+        <button class="btn pri" id="pxSave" type="button">Guardar personal</button>
+      </div>
+    </dialog>
+
+    <!-- MODAL 4: CONTROL DE OPERATIVIDAD Y DÍAS PARADAS DE VEHÍCULO -->
+    <dialog id="dgVeh">
+      <h3 id="vehModalTitle">Operatividad del vehículo / movil</h3>
+      <p class="note" id="vehModalSub" style="margin-top:4px">Control de camionetas y motos: días en servicio vs días que dejan de trabajar (taller, varada, etc.)</p>
+
+      <div class="r2">
+        <div>
+          <label for="vehUnit">Movil o moto</label>
+          <select id="vehUnit"></select>
+        </div>
+        <div>
+          <label for="vehStatus">Estado operativo</label>
+          <select id="vehStatus">
+            <option value="Operativa">🟢 Operativa (En servicio normal)</option>
+            <option value="Taller">🛠️ Taller / Mantenimiento mecánico</option>
+            <option value="Varada">⚠️ Varada / Falla mecánica en ruta</option>
+            <option value="Sin_Personal">👥 Sin cuadrilla / Personal ausente</option>
+            <option value="Pico_Placa">🚫 Pico y placa / Restricción de movilidad</option>
+            <option value="Descanso">💤 Descanso / No programada</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="r2">
+        <div>
+          <label for="vehDate">Fecha inicial</label>
+          <input type="date" id="vehDate" />
+        </div>
+        <div>
+          <label for="vehUntil">Repetir hasta (opcional)</label>
+          <input type="date" id="vehUntil" />
+        </div>
+      </div>
+
+      <label for="vehReason">Motivo o causa de inactividad</label>
+      <input id="vehReason" placeholder="Ej.: Mantenimiento preventivo 20.000 km, reparación de frenos, sin conductor..." />
+
+      <label for="vehNotes">Observaciones / Taller asignado</label>
+      <textarea id="vehNotes" rows="2" placeholder="Detalles adicionales, proveedor de taller, repuestos o contingencia..."></textarea>
+
+      <div class="bar" style="justify-content:flex-end; margin-top:16px">
+        <button class="btn" id="vehCancel" type="button">Cancelar</button>
+        <button class="btn pri" id="vehSave" type="button">Guardar operatividad</button>
+      </div>
+    </dialog>
+
+    <div id="toast" role="status"></div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
